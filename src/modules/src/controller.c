@@ -7,7 +7,8 @@
 #include "controller_mellinger.h"
 #include "controller_indi.h"
 
-#define DEFAULT_CONTROLLER ControllerTypePID
+// #define DEFAULT_CONTROLLER ControllerTypePID 
+#define DEFAULT_CONTROLLER ControllerTypeINDI
 static ControllerType currentController = ControllerTypeAny;
 
 static void initController();

@@ -44,7 +44,9 @@ static float r_yaw;
 static float accelz;
 
 static vector_t refOuterINDI;				// Reference values from outer loop INDI
-static bool outerLoopActive = false ; 		// if 1, outer loop INDI is activated
+
+// static bool outerLoopActive = false ; 		// if 1, outer loop INDI is activated
+static bool outerLoopActive = true; // Activates the outerINDI loop bij defautl
 
 static struct IndiVariables indi = {
 		.g1 = {STABILIZATION_INDI_G1_P, STABILIZATION_INDI_G1_Q, STABILIZATION_INDI_G1_R},
