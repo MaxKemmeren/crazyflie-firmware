@@ -332,7 +332,7 @@ CFLAGS += $(PROCESSOR) $(INCLUDES)
 
 
 CFLAGS += -Wall -Wmissing-braces -fno-strict-aliasing $(C_PROFILE) -std=gnu11
-# CFLAGS += --O0 -Wmissing-braces -fno-strict-aliasing $(C_PROFILE) -std=gnu11 #Use during development
+# CFLAGS += -O0 -Wmissing-braces -fno-strict-aliasing $(C_PROFILE) -std=gnu11 #Use during development
 # Compiler flags to generate dependency files:
 CFLAGS += -MD -MP -MF $(BIN)/dep/$(@).d -MQ $(@)
 #Permits to remove un-used functions and global variables from output file
