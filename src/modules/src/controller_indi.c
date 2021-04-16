@@ -176,6 +176,11 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && !outerLoopActive) {
 		positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
 	}
+	// else{
+	// 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && outerLoopActive){
+	// 		positionControllerINDI(sensors, setpoint, state, &refOuterINDI);
+	// 	}
+	// }
 
 	/*
 	 * Skipping calls faster than ATTITUDE_RATE
@@ -213,7 +218,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 
 				// INDI position controller not active, INDI attitude controller is main loop
 				attitudeDesired.pitch = setpoint->attitude.pitch;
-			
+
 		}else{
 			if (outerLoopActive) {
 				// INDI position controller active, INDI attitude controller becomes inner loop
@@ -251,7 +256,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 */
 
 		float stateAttitudeRateRoll = radians(sensors->gyro.x);
-		float stateAttitudeRatePitch = -radians(sensors->gyro.y); // Account for Crazyflie coordinate system
+		float stateAttitudeRatePitch = -radians(sensors->gyro.y); // Account for Crazyflie coordinate system (niet toch, want pitch draaing is andersom)
 		float stateAttitudeRateYaw = radians(sensors->gyro.z);
 
 		struct FloatRates body_rates = {
@@ -403,7 +408,15 @@ LOG_ADD(LOG_FLOAT, ang_accel_ref_r, &indi.angular_accel_ref.r)
 LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0])
 LOG_ADD(LOG_FLOAT, rate_d[1], &indi.rate_d[1])
 LOG_ADD(LOG_FLOAT, rate_d[2], &indi.rate_d[2])
+
 LOG_ADD(LOG_FLOAT, pitch_desired, &attitudeDesired.pitch)
-LOG_ADD(LOG_FLOAT, roll_desired, &attitudeDesired.roll)
+LOG_ADD(LOG_FLOAT, roll_desired, &attitudeDesired.roll) 	/* attitude angle reference value from an outer loop*/
 LOG_ADD(LOG_FLOAT, thrust_desired, &actuatorThrust)
+LOG_ADD(LOG_FLOAT, p_desired, &rateDesired.roll) 			/* value from the P controller (rate reference)*/
+LOG_ADD(LOG_FLOAT, q_desired, &rateDesired.pitch)
+LOG_ADD(LOG_FLOAT, r_desired, &rateDesired.yaw)
+LOG_ADD(LOG_FLOAT, p_acc_ref, &indi.angular_accel_ref.p) 	/* value that enters provided to inner loop (PD controller output) */
+LOG_ADD(LOG_FLOAT, q_acc_ref, &indi.angular_accel_ref.q)
+
+
 LOG_GROUP_STOP(ctrlINDI)

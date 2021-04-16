@@ -194,7 +194,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// ("-" because T points in neg. z-direction, "*9.81" because T/m=a=g, 
 	// negative psi to account for wrong coordinate frame in the implementation of the inner loop)
 	float g11 = (cosf(att.phi)*sinf(-att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(-att.psi))*(-9.81f);
-	float g12 = (cosf(att.phi)*cosf(-att.theta)*cosf(-att.psi))*(-9.81f);
+	float g12 = (cosf(att.phi)*cosf(att.theta)*cosf(-att.psi))*(-9.81f); 						
 	float g13 = (sinf(att.phi)*sinf(-att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(-att.psi));
 	float g21 = (-cosf(att.phi)*cosf(-att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(-att.psi))*(-9.81f);
 	float g22 = (cosf(att.phi)*cosf(att.theta)*sinf(-att.psi))*(-9.81f);
@@ -252,7 +252,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	indiOuter.T_inner = indiOuter.T_inner + indiOuter.act_dyn_posINDI*(indiOuter.T_inner_f - indiOuter.T_inner); 
 
 	// Compute trust that goes into the inner loop
-		indiOuter.T_incremented = indiOuter.T_tilde + indiOuter.T_inner;
+	indiOuter.T_incremented = indiOuter.T_tilde + indiOuter.T_inner;
 
 	// Compute commanded attitude to the inner INDI
 	indiOuter.attitude_c.phi = indiOuter.attitude_f.phi + indiOuter.phi_tilde*180/M_PI_F;
