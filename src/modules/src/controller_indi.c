@@ -169,6 +169,11 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && !outerLoopActive) {
 		positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
 	}
+	// else{
+	// 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && outerLoopActive){
+	// 		positionControllerINDI(sensors, setpoint, state, &refOuterINDI);
+	// 	}
+	// }
 
 	/*
 	 * Skipping calls faster than ATTITUDE_RATE
