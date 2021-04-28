@@ -32,11 +32,13 @@ static float bound_control_input = 32000.0f;
 static attitude_t attitudeDesired;
 static attitude_t rateDesired;
 static float actuatorThrust;
-static float roll_kp = 5.0f;
-static float pitch_kp = 5.0f;
-static float yaw_kp = 5.0f;
 
-static float attYawError; 
+//Now Defined in the header file.
+// static float roll_kp 	= 5.0f;
+// static float pitch_kp 	= 5.0f;
+// static float yaw_kp 	= 5.0f;
+
+// static float attYawError; 
 
 static float r_roll;
 static float r_pitch;
@@ -159,17 +161,23 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		const state_t *state,
 		const uint32_t tick)
 {
-
+	
+	//The z_distance decoder adds a negative sign to the yaw command, the position decoder doesn't
 	if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
 		// Rate-controled YAW is moving YAW angle setpoint
+
 		if (setpoint->mode.yaw == modeVelocity) {
-			attitudeDesired.yaw += setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT;
+			attitudeDesired.yaw += setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT; //if line 140 (or the other setpoints) in crtp_commander_generic.c has the - sign remove add a -sign here to convert the crazyfly coords (ENU) to INDI  body coords (NED)
 			while (attitudeDesired.yaw > 180.0f)
 				attitudeDesired.yaw -= 360.0f;
 			while (attitudeDesired.yaw < -180.0f)
 				attitudeDesired.yaw += 360.0f;
+
+			attitudeDesired.yaw = radians(attitudeDesired.yaw); //convert to radians
 		} else {
 			attitudeDesired.yaw = setpoint->attitude.yaw;
+			attitudeDesired.yaw = capAngle(attitudeDesired.yaw); //use the capangle as this is also done in velocity mode
+			attitudeDesired.yaw = -radians(attitudeDesired.yaw); //convert to radians and add negative sign to convert from ENU to NED
 		}
 	}
 
@@ -205,24 +213,24 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		if (setpoint->mode.x == modeDisable) {
 
 				// INDI position controller not active, INDI attitude controller is main loop
-				attitudeDesired.roll = setpoint->attitude.roll;
+				attitudeDesired.roll = radians(setpoint->attitude.roll);
 			
 		}else{
 			if (outerLoopActive) {
 				// INDI position controller active, INDI attitude controller becomes inner loop
-				attitudeDesired.roll = refOuterINDI.x;
+				attitudeDesired.roll = refOuterINDI.x; //outer loop provides radians
 			}
 		}
 
 		if (setpoint->mode.y == modeDisable) {
 
 				// INDI position controller not active, INDI attitude controller is main loop
-				attitudeDesired.pitch = setpoint->attitude.pitch;
+				attitudeDesired.pitch = radians(setpoint->attitude.pitch); //no conversion as CF coords use left hand for positive pitch.
 
 		}else{
 			if (outerLoopActive) {
 				// INDI position controller active, INDI attitude controller becomes inner loop
-				attitudeDesired.pitch = refOuterINDI.y;
+				attitudeDesired.pitch = refOuterINDI.y; //outer loop provides radians
 			}
 		}
 		
@@ -231,23 +239,28 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 //	                                attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
 //	                                &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
 
-		rateDesired.roll = roll_kp*(attitudeDesired.roll - state->attitude.roll);
-		rateDesired.pitch = pitch_kp*(attitudeDesired.pitch - state->attitude.pitch);
-		//rateDesired.yaw = yaw_kp*(attitudeDesired.yaw - state->attitude.yaw);
-		attYawError = attitudeDesired.yaw - state->attitude.yaw;		
-		attYawError = capAngle(attYawError);
-		rateDesired.yaw = yaw_kp*attYawError;
+		//Proportional controller on attitude angles [rad]
+		rateDesired.roll 	= indi.reference_acceleration.err_p*(attitudeDesired.roll - radians(state->attitude.roll));
+		rateDesired.pitch 	= indi.reference_acceleration.err_q*(attitudeDesired.pitch - radians(state->attitude.pitch));
+		rateDesired.yaw 	= indi.reference_acceleration.err_r*(attitudeDesired.yaw - (-radians(state->attitude.yaw))); //negative yaw ENU  ->  NED
+		
+		//This is already done above in lines 165 -> 180
+		// attYawError = attitudeDesired.yaw - state->attitude.yaw;		
+		// attYawError = capAngle(attYawError);
+		// rateDesired.yaw = yaw_kp*attYawError;
 
 
 		// For roll and pitch, if velocity mode, overwrite rateDesired with the setpoint
 		// value. Also reset the PID to avoid error buildup, which can lead to unstable
 		// behavior if level mode is engaged later
+		
+		//Not sure if there needs to be any sign inversion! @Max Kemmeren
 		if (setpoint->mode.roll == modeVelocity) {
-			rateDesired.roll = setpoint->attitudeRate.roll;
+			rateDesired.roll = radians(setpoint->attitudeRate.roll);
 			attitudeControllerResetRollAttitudePID();
 		}
 		if (setpoint->mode.pitch == modeVelocity) {
-			rateDesired.pitch = setpoint->attitudeRate.pitch;
+			rateDesired.pitch = radians(setpoint->attitudeRate.pitch);
 			attitudeControllerResetPitchAttitudePID();
 		}
 
@@ -255,17 +268,17 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 * 1 - Update the gyro filter with the new measurements.
 		 */
 
-		float stateAttitudeRateRoll = radians(sensors->gyro.x);
-		float stateAttitudeRatePitch = -radians(sensors->gyro.y); // Account for Crazyflie coordinate system (niet toch, want pitch draaing is andersom)
-		float stateAttitudeRateYaw = radians(sensors->gyro.z);
+		float stateAttitudeRateRoll 	= radians(sensors->gyro.x); 
+		float stateAttitudeRatePitch 	= -radians(sensors->gyro.y); //Account for gyro measuring pitch rate in opposite direction relative to both the CF coords and INDI coords
+		float stateAttitudeRateYaw 		= -radians(sensors->gyro.z); //Account for conversion of ENU -> NED
 
 		struct FloatRates body_rates = {
 				.p = stateAttitudeRateRoll,
 				.q = stateAttitudeRatePitch,
 				.r = stateAttitudeRateYaw,
 		};
-		filter_pqr(indi.rate, &body_rates);
 
+		filter_pqr(indi.rate, &body_rates); 
 
 		/*
 		 * 2 - Calculate the derivative with finite difference.
@@ -288,15 +301,15 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 * 4.2 Angular_acceleration_reference = D * (rate_reference – rate_measurement)
 		 */
 
-		float attitude_error_p = radians(rateDesired.roll) - stateAttitudeRateRoll;
-		float attitude_error_q = radians(rateDesired.pitch) - stateAttitudeRatePitch;
-		float attitude_error_r = radians(rateDesired.yaw) - stateAttitudeRateYaw;
+		float attitude_error_p = rateDesired.roll - stateAttitudeRateRoll; 
+		float attitude_error_q = rateDesired.pitch - stateAttitudeRatePitch;
+		float attitude_error_r = rateDesired.yaw - stateAttitudeRateYaw;
 
-		indi.angular_accel_ref.p = indi.reference_acceleration.err_p * attitude_error_p;
+		indi.angular_accel_ref.p = indi.reference_acceleration.rate_p * attitude_error_p;
 
-		indi.angular_accel_ref.q = indi.reference_acceleration.err_q * attitude_error_q;
+		indi.angular_accel_ref.q = indi.reference_acceleration.rate_q * attitude_error_q;
 
-		indi.angular_accel_ref.r = indi.reference_acceleration.err_r * attitude_error_r;
+		indi.angular_accel_ref.r = indi.reference_acceleration.rate_r * attitude_error_r;
 
 		/*
 		 * 5. Update the For each axis: delta_command = 1/control_effectiveness * (angular_acceleration_reference – angular_acceleration)
@@ -308,7 +321,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		//(they have significant inertia, see the paper mentioned in the header for more explanation)
 		indi.du.p = 1.0f / indi.g1.p * (indi.angular_accel_ref.p - indi.rate_d[0]);
 		indi.du.q = 1.0f / indi.g1.q * (indi.angular_accel_ref.q - indi.rate_d[1]);
-		indi.du.r = 1.0f / (indi.g1.r - indi.g2) * (indi.angular_accel_ref.r - indi.rate_d[2] - indi.g2 * indi.du.r);
+		indi.du.r = 1.0f / (indi.g1.r + indi.g2) * (indi.angular_accel_ref.r - indi.rate_d[2] + indi.g2 * indi.du.r);
 
 
 		/*
@@ -335,7 +348,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 	indi.thrust = actuatorThrust;
 	r_roll = radians(sensors->gyro.x);
 	r_pitch = -radians(sensors->gyro.y);
-	r_yaw = radians(sensors->gyro.z);
+	r_yaw = -radians(sensors->gyro.z);
 	accelz = sensors->acc.z;
 
 	//Don't increment if thrust is off
@@ -366,9 +379,9 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 PARAM_GROUP_START(ctrlINDI)
 PARAM_ADD(PARAM_FLOAT, thrust_threshold, &thrust_threshold)
 PARAM_ADD(PARAM_FLOAT, bound_ctrl_input, &bound_control_input)
-PARAM_ADD(PARAM_FLOAT, roll_kp, &roll_kp)
-PARAM_ADD(PARAM_FLOAT, pitch_kp, &pitch_kp)
-PARAM_ADD(PARAM_FLOAT, yaw_kp, &yaw_kp)
+// PARAM_ADD(PARAM_FLOAT, roll_kp, &roll_kp)
+// PARAM_ADD(PARAM_FLOAT, pitch_kp, &pitch_kp)
+// PARAM_ADD(PARAM_FLOAT, yaw_kp, &yaw_kp)
 PARAM_ADD(PARAM_FLOAT, g1_p, &indi.g1.p)
 PARAM_ADD(PARAM_FLOAT, g1_q, &indi.g1.q)
 PARAM_ADD(PARAM_FLOAT, g1_r, &indi.g1.r)
@@ -409,14 +422,16 @@ LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0])
 LOG_ADD(LOG_FLOAT, rate_d[1], &indi.rate_d[1])
 LOG_ADD(LOG_FLOAT, rate_d[2], &indi.rate_d[2])
 
-LOG_ADD(LOG_FLOAT, pitch_desired, &attitudeDesired.pitch)
-LOG_ADD(LOG_FLOAT, roll_desired, &attitudeDesired.roll) 	/* attitude angle reference value from an outer loop*/
-LOG_ADD(LOG_FLOAT, thrust_desired, &actuatorThrust)
-LOG_ADD(LOG_FLOAT, p_desired, &rateDesired.roll) 			/* value from the P controller (rate reference)*/
-LOG_ADD(LOG_FLOAT, q_desired, &rateDesired.pitch)
-LOG_ADD(LOG_FLOAT, r_desired, &rateDesired.yaw)
-LOG_ADD(LOG_FLOAT, p_acc_ref, &indi.angular_accel_ref.p) 	/* value that enters provided to inner loop (PD controller output) */
-LOG_ADD(LOG_FLOAT, q_acc_ref, &indi.angular_accel_ref.q)
+LOG_ADD(LOG_FLOAT, uf_p, &indi.u[0].o[0])
+LOG_ADD(LOG_FLOAT, uf_q, &indi.u[1].o[0])
+LOG_ADD(LOG_FLOAT, uf_r, &indi.u[2].o[0])
 
+LOG_ADD(LOG_FLOAT, Omega_f_p, &indi.rate[0].o[0])
+LOG_ADD(LOG_FLOAT, Omega_f_q, &indi.rate[1].o[0])
+LOG_ADD(LOG_FLOAT, Omega_f_r, &indi.rate[2].o[0])
+
+LOG_ADD(LOG_FLOAT, n_p, &attitudeDesired.roll)
+LOG_ADD(LOG_FLOAT, n_q, &attitudeDesired.pitch)
+LOG_ADD(LOG_FLOAT, n_r, &attitudeDesired.yaw)
 
 LOG_GROUP_STOP(ctrlINDI)
