@@ -182,7 +182,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// Transform lin. acceleration in NED (add gravity to the z-component)
 	indiOuter.linear_accel_ft.x = M_OB[0][0]*indiOuter.linear_accel_f.x + M_OB[0][1]*indiOuter.linear_accel_f.y + M_OB[0][2]*indiOuter.linear_accel_f.z;
 	indiOuter.linear_accel_ft.y = M_OB[1][0]*indiOuter.linear_accel_f.x + M_OB[1][1]*indiOuter.linear_accel_f.y + M_OB[1][2]*indiOuter.linear_accel_f.z;
-	indiOuter.linear_accel_ft.z = M_OB[2][0]*indiOuter.linear_accel_f.x + M_OB[2][1]*indiOuter.linear_accel_f.y + M_OB[2][2]*indiOuter.linear_accel_f.z + 9.81f;
+	indiOuter.linear_accel_ft.z = M_OB[2][0]*indiOuter.linear_accel_f.x + M_OB[2][1]*indiOuter.linear_accel_f.y + M_OB[2][2]*indiOuter.linear_accel_f.z + 9.81f; 
 
 	// Compute lin. acceleration error
 	indiOuter.linear_accel_err.x = indiOuter.linear_accel_ref.x - indiOuter.linear_accel_ft.x;
@@ -201,6 +201,8 @@ void positionControllerINDI(const sensorData_t *sensors,
 	float g31 = (-sinf(att.phi)*cosf(att.theta))*(-9.81f);
 	float g32 = (-cosf(att.phi)*sinf(att.theta))*(-9.81f);
 	float g33 = (cosf(att.phi)*cosf(att.theta));
+
+	//Maybe add the found forumula for thrust here using the pwm and battery voltage data, such that it is not fixed around hover thrust
 
 	// Next four blocks of the code are to compute the Moore-Penrose inverse of the G matrix
 	// (G'*G)
@@ -263,8 +265,8 @@ void positionControllerINDI(const sensorData_t *sensors,
 	indiOuter.attitude_c.theta = clamp(indiOuter.attitude_c.theta, -radians(pq_clamp), radians(pq_clamp));
 
 	// Reference values, which are passed to the inner loop INDI (attitude controller)
-	refOuterINDI->x = indiOuter.attitude_c.phi;
-	refOuterINDI->y = indiOuter.attitude_c.theta;
+	refOuterINDI->x = radians(indiOuter.attitude_c.phi);
+	refOuterINDI->y = radians(indiOuter.attitude_c.theta);
 	refOuterINDI->z = indiOuter.T_incremented;
 }
 
