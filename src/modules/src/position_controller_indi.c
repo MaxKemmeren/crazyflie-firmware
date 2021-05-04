@@ -27,6 +27,8 @@
 
 #include "position_controller_indi.h"
 #include "math3d.h"
+#include "pm.h"
+#include "power_distribution.h"
 
 // Position controller gains
 float K_xi_x = 1.0f;
@@ -38,6 +40,10 @@ float K_dxi_y = 5.0f;
 float K_dxi_z = 5.0f;
 // Thrust mapping parameter
 float K_thr = 0.00024730f;
+
+float Thrust_0;
+float motor_norm[] = {0, 0, 0, 0};
+float motor_norm_test[] = {0,0,0,0};
 
 static float posS_x, posS_y, posS_z;			// Current position
 static float velS_x, velS_y, velS_z;			// Current velocity
@@ -165,7 +171,7 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// Obtain actual attitude values (in deg)
 	indiOuter.attitude_s.phi = state->attitude.roll; 
 	indiOuter.attitude_s.theta = state->attitude.pitch;
-	indiOuter.attitude_s.psi = -state->attitude.yaw; //Now sign is changed of yaw which is correct, but the gyro is not changed
+	indiOuter.attitude_s.psi = -state->attitude.yaw; 
 	filter_ang(indiOuter.ang, &indiOuter.attitude_s, &indiOuter.attitude_f);
 
 
@@ -193,14 +199,36 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// Elements of the G matrix (see publication for more information) 
 	// ("-" because T points in neg. z-direction, "*9.81" because T/m=a=g, 
 	// negative psi to account for wrong coordinate frame in the implementation of the inner loop)
-	float g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*(-9.81f); 
-	float g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*(-9.81f); 						
+	float Battery_norm = pmGetBatteryVoltage()/NORM_BATTERY;
+
+	motor_norm_test[0] = (motorPower.m1/NORM_THRUST);
+	motor_norm_test[1] = (motorPower.m2/NORM_THRUST);
+	motor_norm_test[2] = (motorPower.m3/NORM_THRUST);
+	motor_norm_test[3] = (motorPower.m4/NORM_THRUST);
+
+	motor_norm[0] = 11.093358483549203f - 39.08104165843915f * (motorPower.m1/NORM_THRUST) - 9.525647087583181f * Battery_norm + 20.573302305476638f * (motorPower.m1/NORM_THRUST) * (motorPower.m1/NORM_THRUST) + 38.42885066644033f * (motorPower.m1/NORM_THRUST) * Battery_norm;
+	motor_norm[1] = 11.093358483549203f - 39.08104165843915f * (motorPower.m2/NORM_THRUST) - 9.525647087583181f * Battery_norm + 20.573302305476638f * (motorPower.m2/NORM_THRUST) * (motorPower.m2/NORM_THRUST) + 38.42885066644033f * (motorPower.m2/NORM_THRUST) * Battery_norm;
+	motor_norm[2] = 11.093358483549203f - 39.08104165843915f * (motorPower.m3/NORM_THRUST) - 9.525647087583181f * Battery_norm + 20.573302305476638f * (motorPower.m3/NORM_THRUST) * (motorPower.m3/NORM_THRUST) + 38.42885066644033f * (motorPower.m3/NORM_THRUST) * Battery_norm;
+	motor_norm[3] = 11.093358483549203f - 39.08104165843915f * (motorPower.m4/NORM_THRUST) - 9.525647087583181f * Battery_norm + 20.573302305476638f * (motorPower.m4/NORM_THRUST) * (motorPower.m4/NORM_THRUST) + 38.42885066644033f * (motorPower.m4/NORM_THRUST) * Battery_norm;
+
+	float sum;
+	int loop;
+   	sum = 0;
+   
+    for(loop = 3; loop >= 0; loop--) {
+		sum = sum + motor_norm[loop];      
+  	}
+
+	Thrust_0 = ((sum/1000.0f)*-9.81f)/0.037f; 
+
+	float g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 
+	float g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 						
 	float g13 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi));
-	float g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*(-9.81f);
-	float g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*(-9.81f);
+	float g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
+	float g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
 	float g23 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi));
-	float g31 = (-sinf(att.phi)*cosf(att.theta))*(-9.81f);
-	float g32 = (-cosf(att.phi)*sinf(att.theta))*(-9.81f);
+	float g31 = (-sinf(att.phi)*cosf(att.theta))*Thrust_0; //(-9.81f);
+	float g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0; //(-9.81f);
 	float g33 = (cosf(att.phi)*cosf(att.theta));
 
 	//Maybe add the found forumula for thrust here using the pwm and battery voltage data, such that it is not fixed around hover thrust
@@ -350,5 +378,16 @@ LOG_ADD(LOG_FLOAT, T_incremented, &indiOuter.T_incremented)
 
 LOG_ADD(LOG_FLOAT, cmd_phi, &indiOuter.attitude_c.phi)
 LOG_ADD(LOG_FLOAT, cmd_theta, &indiOuter.attitude_c.theta)
+
+LOG_ADD(LOG_FLOAT, T_0,  &Thrust_0)
+LOG_ADD(LOG_FLOAT, motor_1_norm, &motor_norm_test[0])
+LOG_ADD(LOG_FLOAT, motor_2_norm, &motor_norm_test[1])
+LOG_ADD(LOG_FLOAT, motor_3_norm, &motor_norm_test[2])
+LOG_ADD(LOG_FLOAT, motor_4_norm, &motor_norm_test[3])
+
+LOG_ADD(LOG_UINT32, motor_1, &motorPower.m1)
+LOG_ADD(LOG_UINT32, motor_2, &motorPower.m2)
+LOG_ADD(LOG_UINT32, motor_3, &motorPower.m3)
+LOG_ADD(LOG_UINT32, motor_4, &motorPower.m4)
 
 LOG_GROUP_STOP(posCtrlIndi)

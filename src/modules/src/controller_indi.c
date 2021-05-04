@@ -184,11 +184,6 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && !outerLoopActive) {
 		positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
 	}
-	// else{
-	// 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && outerLoopActive){
-	// 		positionControllerINDI(sensors, setpoint, state, &refOuterINDI);
-	// 	}
-	// }
 
 	/*
 	 * Skipping calls faster than ATTITUDE_RATE
@@ -213,7 +208,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		if (setpoint->mode.x == modeDisable) {
 
 				// INDI position controller not active, INDI attitude controller is main loop
-				attitudeDesired.roll = radians(setpoint->attitude.roll);
+				attitudeDesired.roll = radians(setpoint->attitude.roll); //no sign conversion as CF coords is equal to NED for roll
 			
 		}else{
 			if (outerLoopActive) {
@@ -225,7 +220,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		if (setpoint->mode.y == modeDisable) {
 
 				// INDI position controller not active, INDI attitude controller is main loop
-				attitudeDesired.pitch = radians(setpoint->attitude.pitch); //no conversion as CF coords use left hand for positive pitch.
+				attitudeDesired.pitch = radians(setpoint->attitude.pitch); //no sign conversion as CF coords use left hand for positive pitch.
 
 		}else{
 			if (outerLoopActive) {
@@ -364,7 +359,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 			positionControllerResetAllPID();
 
 			// Reset the calculated YAW angle for rate control
-			attitudeDesired.yaw = state->attitude.yaw;
+			attitudeDesired.yaw = -state->attitude.yaw;
 		}
 	}
 

@@ -31,6 +31,9 @@
 #define MIN_THRUST  0
 #define MAX_THRUST  60000
 
+#define NORM_THRUST 65536.0f
+#define NORM_BATTERY 4.2f
+
 // Cutoff frequency used in the filtering 
 #define POSITION_INDI_FILT_CUTOFF 8.0f
 
@@ -83,5 +86,6 @@ void positionControllerINDI(const sensorData_t *sensors,
                             setpoint_t *setpoint,
                             const state_t *state, 
                             vector_t *refOuterINDI);
+
 
 #endif //__POSITION_CONTROLLER_INDI_H__
