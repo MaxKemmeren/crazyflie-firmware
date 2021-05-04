@@ -28,10 +28,16 @@
 
 #include "stabilizer_types.h"
 
+struct motorPWM_s{
+  uint32_t m1;
+  uint32_t m2;
+  uint32_t m3;
+  uint32_t m4;
+} motorPower;
+
 void powerDistributionInit(void);
 bool powerDistributionTest(void);
 void powerDistribution(const control_t *control);
 void powerStop();
-
 
 #endif //__POWER_DISTRIBUTION_H__

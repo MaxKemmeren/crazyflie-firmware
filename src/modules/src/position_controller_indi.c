@@ -27,6 +27,8 @@
 
 #include "position_controller_indi.h"
 #include "math3d.h"
+#include "pm.h"
+#include "power_distribution.h"
 
 // Position controller gains
 float K_xi_x = 1.0f;
@@ -195,11 +197,11 @@ void positionControllerINDI(const sensorData_t *sensors,
 	float g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*(-9.81f);
 	float g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*(-9.81f);
 	float g13 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi));
-	float g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*(-9.81f);
-	float g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*(-9.81f);
+	float g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
+	float g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
 	float g23 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi));
-	float g31 = (-sinf(att.phi)*cosf(att.theta))*(-9.81f);
-	float g32 = (-cosf(att.phi)*sinf(att.theta))*(-9.81f);
+	float g31 = (-sinf(att.phi)*cosf(att.theta))*Thrust_0; //(-9.81f);
+	float g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0; //(-9.81f);
 	float g33 = (cosf(att.phi)*cosf(att.theta));
 
 	//Maybe add the found forumula for thrust here using the pwm and battery voltage data, such that it is not fixed around hover thrust
@@ -477,5 +479,16 @@ LOG_ADD(LOG_FLOAT, cmd_phi, &indiOuter.attitude_c.phi)
  * @brief INDI pitch angle command to inner loop [rad]
  */
 LOG_ADD(LOG_FLOAT, cmd_theta, &indiOuter.attitude_c.theta)
+
+LOG_ADD(LOG_FLOAT, T_0,  &Thrust_0)
+LOG_ADD(LOG_FLOAT, motor_1_norm, &motor_norm_test[0])
+LOG_ADD(LOG_FLOAT, motor_2_norm, &motor_norm_test[1])
+LOG_ADD(LOG_FLOAT, motor_3_norm, &motor_norm_test[2])
+LOG_ADD(LOG_FLOAT, motor_4_norm, &motor_norm_test[3])
+
+LOG_ADD(LOG_UINT32, motor_1, &motorPower.m1)
+LOG_ADD(LOG_UINT32, motor_2, &motorPower.m2)
+LOG_ADD(LOG_UINT32, motor_3, &motorPower.m3)
+LOG_ADD(LOG_UINT32, motor_4, &motorPower.m4)
 
 LOG_GROUP_STOP(posCtrlIndi)
