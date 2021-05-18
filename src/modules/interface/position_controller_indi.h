@@ -43,6 +43,8 @@
 #include "math3d.h"
 #include "log.h"
 #include "param.h"
+// #include "arm_math.h"
+
 
 struct Vectr {
   float x; 
@@ -55,6 +57,23 @@ struct Angles {
   float theta;
   float psi;
 };
+
+// /** Stucture for the RBF function */
+// struct RBF_form_s{
+// 	float centers_s[6];
+// 	float kernel_width_s[6];
+// 	float weights_s[7];
+// };
+
+// /**Structure for the Ordinary leas squares */
+// struct OLS_s{
+//   int reg_rows;
+//   int reg_cols;
+
+//   float reg_matrix_s[21*7]; //array type structure
+//   float data_points_x_s[21];
+//   float data_points_y_s[21]; //data point (x,y) every 5mm from 0 -> 10 cm, so 21 datapoints
+// };
 
 struct IndiOuterVariables {
 
@@ -87,5 +106,10 @@ void positionControllerINDI(const sensorData_t *sensors,
                             const state_t *state, 
                             vector_t *refOuterINDI);
 
+// float RBF_element(struct RBF_form_s *RBF, float x, int element);
+// float RBF_result(struct RBF_form_s *RBF, float x);
+// float RBF_der_result(struct RBF_form_s *RBF, float x); 
+// void OLS_weights(struct RBF_form_s *RBF, struct OLS_s *OLS);
+// void Create_reg_mat(struct OLS_s *OLS, struct RBF_form_s *RBF);
 
 #endif //__POSITION_CONTROLLER_INDI_H__
