@@ -37,21 +37,23 @@
 
 #define ATTITUDE_UPDATE_DT    (float)(1.0f/ATTITUDE_RATE)
 
-// these parameters are used in the filtering of the angular acceleration
+// these parameters are used in the filtering of the angular acceleration (Hz)
 #define STABILIZATION_INDI_FILT_CUTOFF 8.0f
 
 // the yaw sometimes requires more filtering
 #define STABILIZATION_INDI_FILT_CUTOFF_R STABILIZATION_INDI_FILT_CUTOFF
 
-// Control effectiveness coefficients
+// Control effectiveness coefficients values Volodscoi
 #define STABILIZATION_INDI_G1_P 0.0066146f 
 #define STABILIZATION_INDI_G1_Q 0.0052125f
 #define STABILIZATION_INDI_G1_R 0.001497f
 #define STABILIZATION_INDI_G2_R 0.000043475f
-// #define STABILIZATION_INDI_G1_P 0.0083842f
-// #define STABILIZATION_INDI_G1_Q 0.0083292f
-// #define STABILIZATION_INDI_G1_R -0.00061711f
-// #define STABILIZATION_INDI_G2_R -0.000059748f
+
+// Control effectiveness coefficients values Max Kemmeren
+// #define STABILIZATION_INDI_G1_P 0.0032502f
+// #define STABILIZATION_INDI_G1_Q 0.0027555f
+// #define STABILIZATION_INDI_G1_R 0.00068154f
+// #define STABILIZATION_INDI_G2_R 0.00001725f
 
 //Proportional gains
 #define STABILIZATION_INDI_REF_ERR_P 5.0f 
@@ -67,6 +69,7 @@
 #define STABILIZATION_INDI_ACT_DYN_P 0.03149f
 #define STABILIZATION_INDI_ACT_DYN_Q 0.03149f
 #define STABILIZATION_INDI_ACT_DYN_R 0.03149f
+
 // #define STABILIZATION_INDI_ACT_DYN_P 0.0125f
 // #define STABILIZATION_INDI_ACT_DYN_Q 0.0125f
 // #define STABILIZATION_INDI_ACT_DYN_R 0.0125f

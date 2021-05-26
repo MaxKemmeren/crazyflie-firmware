@@ -40,10 +40,10 @@ static float actuatorThrust;
 
 // static float attYawError; 
 
-static float r_roll;
-static float r_pitch;
-static float r_yaw;
-static float accelz;
+// static float r_roll;
+// static float r_pitch;
+// static float r_yaw;
+// static float accelz;
 
 static vector_t refOuterINDI;				// Reference values from outer loop INDI
 
@@ -71,6 +71,8 @@ static inline void float_rates_zero(struct FloatRates *fr) {
 	fr->q = 0.0f;
 	fr->r = 0.0f;
 }
+
+struct FloatRates body_rates;
 
 void indi_init_filters(void)
 {
@@ -263,15 +265,9 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 * 1 - Update the gyro filter with the new measurements.
 		 */
 
-		float stateAttitudeRateRoll 	= radians(sensors->gyro.x); 
-		float stateAttitudeRatePitch 	= -radians(sensors->gyro.y); //Account for gyro measuring pitch rate in opposite direction relative to both the CF coords and INDI coords
-		float stateAttitudeRateYaw 		= -radians(sensors->gyro.z); //Account for conversion of ENU -> NED
-
-		struct FloatRates body_rates = {
-				.p = stateAttitudeRateRoll,
-				.q = stateAttitudeRatePitch,
-				.r = stateAttitudeRateYaw,
-		};
+		body_rates.p = radians(sensors->gyro.x); 
+		body_rates.q = -radians(sensors->gyro.y); //Account for gyro measuring pitch rate in opposite direction relative to both the CF coords and INDI coords
+		body_rates.r = -radians(sensors->gyro.z); //Account for conversion of ENU -> NED
 
 		filter_pqr(indi.rate, &body_rates); 
 
@@ -280,7 +276,6 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 */
 
 		finite_difference_from_filter(indi.rate_d, indi.rate);
-
 
 		/*
 		 * 3 - same filter on the actuators (or control_t values), using the commands from the previous timestep.
@@ -296,9 +291,9 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 * 4.2 Angular_acceleration_reference = D * (rate_reference – rate_measurement)
 		 */
 
-		float attitude_error_p = rateDesired.roll - stateAttitudeRateRoll; 
-		float attitude_error_q = rateDesired.pitch - stateAttitudeRatePitch;
-		float attitude_error_r = rateDesired.yaw - stateAttitudeRateYaw;
+		float attitude_error_p = rateDesired.roll - body_rates.p; 
+		float attitude_error_q = rateDesired.pitch - body_rates.q;
+		float attitude_error_r = rateDesired.yaw - body_rates.r;
 
 		indi.angular_accel_ref.p = indi.reference_acceleration.rate_p * attitude_error_p;
 
@@ -340,11 +335,12 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 
 	}
 
-	indi.thrust = actuatorThrust;
-	r_roll = radians(sensors->gyro.x);
-	r_pitch = -radians(sensors->gyro.y);
-	r_yaw = -radians(sensors->gyro.z);
-	accelz = sensors->acc.z;
+	indi.thrust = actuatorThrust; //NOTE this has no filter applied, so this is directly fed from outerloop. Is that correct?
+
+	// r_roll = radians(sensors->gyro.x);
+	// r_pitch = -radians(sensors->gyro.y);
+	// r_yaw = -radians(sensors->gyro.z);
+	// accelz = sensors->acc.z;
 
 	//Don't increment if thrust is off
 	//TODO: this should be something more elegant, but without this the inputs
@@ -368,7 +364,6 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 	control->roll = indi.u_in.p;
 	control->pitch = indi.u_in.q;
 	control->yaw  = indi.u_in.r;
-
 }
 
 PARAM_GROUP_START(ctrlINDI)
@@ -400,10 +395,13 @@ LOG_ADD(LOG_FLOAT, cmd_thrust, &indi.thrust)
 LOG_ADD(LOG_FLOAT, cmd_roll, &indi.u_in.p)
 LOG_ADD(LOG_FLOAT, cmd_pitch, &indi.u_in.q)
 LOG_ADD(LOG_FLOAT, cmd_yaw, &indi.u_in.r)
-LOG_ADD(LOG_FLOAT, r_roll, &r_roll)
-LOG_ADD(LOG_FLOAT, r_pitch, &r_pitch)
-LOG_ADD(LOG_FLOAT, r_yaw, &r_yaw)
-LOG_ADD(LOG_FLOAT, accelz, &accelz)
+// LOG_ADD(LOG_FLOAT, r_roll, &r_roll)
+// LOG_ADD(LOG_FLOAT, r_pitch, &r_pitch)
+// LOG_ADD(LOG_FLOAT, r_yaw, &r_yaw)
+LOG_ADD(LOG_FLOAT, r_roll, &body_rates.p) //Unfiltered body rates, Gyroscope measurements
+LOG_ADD(LOG_FLOAT, r_pitch, &body_rates.p)
+LOG_ADD(LOG_FLOAT, r_yaw, &body_rates.p)
+// LOG_ADD(LOG_FLOAT, accelz, &accelz)
 LOG_ADD(LOG_FLOAT, u_act_dyn_p, &indi.u_act_dyn.p)
 LOG_ADD(LOG_FLOAT, u_act_dyn_q, &indi.u_act_dyn.q)
 LOG_ADD(LOG_FLOAT, u_act_dyn_r, &indi.u_act_dyn.r)
@@ -413,7 +411,7 @@ LOG_ADD(LOG_FLOAT, du_r, &indi.du.r)
 LOG_ADD(LOG_FLOAT, ang_accel_ref_p, &indi.angular_accel_ref.p)
 LOG_ADD(LOG_FLOAT, ang_accel_ref_q, &indi.angular_accel_ref.q)
 LOG_ADD(LOG_FLOAT, ang_accel_ref_r, &indi.angular_accel_ref.r)
-LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0])
+LOG_ADD(LOG_FLOAT, rate_d[0], &indi.rate_d[0]) //Derived angular acceleration, from the filtered Gyroscope measurements.
 LOG_ADD(LOG_FLOAT, rate_d[1], &indi.rate_d[1])
 LOG_ADD(LOG_FLOAT, rate_d[2], &indi.rate_d[2])
 
@@ -421,8 +419,8 @@ LOG_ADD(LOG_FLOAT, uf_p, &indi.u[0].o[0])
 LOG_ADD(LOG_FLOAT, uf_q, &indi.u[1].o[0])
 LOG_ADD(LOG_FLOAT, uf_r, &indi.u[2].o[0])
 
-LOG_ADD(LOG_FLOAT, Omega_f_p, &indi.rate[0].o[0])
-LOG_ADD(LOG_FLOAT, Omega_f_q, &indi.rate[1].o[0])
+LOG_ADD(LOG_FLOAT, Omega_f_p, &indi.rate[0].o[0]) //Filtered body rates, Gyroscope measurements 
+LOG_ADD(LOG_FLOAT, Omega_f_q, &indi.rate[1].o[0]) 
 LOG_ADD(LOG_FLOAT, Omega_f_r, &indi.rate[2].o[0])
 
 LOG_ADD(LOG_FLOAT, n_p, &attitudeDesired.roll)
