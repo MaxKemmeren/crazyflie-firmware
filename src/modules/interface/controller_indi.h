@@ -49,6 +49,7 @@
 #define STABILIZATION_INDI_G1_R 0.001497f
 #define STABILIZATION_INDI_G2_R 0.000043475f
 
+
 // Control effectiveness coefficients values Max Kemmeren, these will become the new ones, not finalized yet
 // #define STABILIZATION_INDI_G1_P 0.0032502f
 // #define STABILIZATION_INDI_G1_Q 0.0027555f
@@ -69,6 +70,7 @@
 #define STABILIZATION_INDI_ACT_DYN_P 0.03149f
 #define STABILIZATION_INDI_ACT_DYN_Q 0.03149f
 #define STABILIZATION_INDI_ACT_DYN_R 0.03149f
+
 // #define STABILIZATION_INDI_ACT_DYN_P 0.0125f
 // #define STABILIZATION_INDI_ACT_DYN_Q 0.0125f
 // #define STABILIZATION_INDI_ACT_DYN_R 0.0125f

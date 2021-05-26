@@ -43,7 +43,7 @@
 #include "math3d.h"
 #include "log.h"
 #include "param.h"
-// #include "arm_math.h"
+#include "arm_math.h"
 
 
 struct Vectr {
@@ -58,22 +58,22 @@ struct Angles {
   float psi;
 };
 
-// /** Stucture for the RBF function */
-// struct RBF_form_s{
-// 	float centers_s[6];
-// 	float kernel_width_s[6];
-// 	float weights_s[7];
-// };
+/** Stucture for the RBF function */
+struct RBF_form_s{
+	float centers_s[6];
+	float kernel_width_s[6];
+	float weights_s[7];
+};
 
-// /**Structure for the Ordinary leas squares */
-// struct OLS_s{
-//   int reg_rows;
-//   int reg_cols;
+/**Structure for the Ordinary leas squares */
+struct OLS_s{
+  int reg_rows;
+  int reg_cols;
 
-//   float reg_matrix_s[21*7]; //array type structure
-//   float data_points_x_s[21];
-//   float data_points_y_s[21]; //data point (x,y) every 5mm from 0 -> 10 cm, so 21 datapoints
-// };
+  float reg_matrix_s[21*7]; //array type structure
+  float data_points_x_s[21];
+  float data_points_y_s[21]; //data point (x,y) every 5mm from 0 -> 10 cm, so 21 datapoints
+};
 
 struct IndiOuterVariables {
 

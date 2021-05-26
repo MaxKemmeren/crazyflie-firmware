@@ -58,6 +58,8 @@ static inline void float_rates_zero(struct FloatRates *fr) {
 	fr->r = 0.0f;
 }
 
+struct FloatRates body_rates;
+
 void indi_init_filters(void)
 {
 	// tau = 1/(2*pi*Fc)
@@ -276,6 +278,10 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		 */
 
 		//Increment in angular acceleration requires increment in control input
+
+
+
+
 		//G1 is the control effectiveness. In the yaw axis, we need something additional: G2.
 		//It takes care of the angular acceleration caused by the change in rotation rate of the propellers
 		//(they have significant inertia, see the paper mentioned in the header for more explanation)
@@ -329,7 +335,6 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 	control->roll = indi.u_in.p;
 	control->pitch = indi.u_in.q;
 	control->yaw  = indi.u_in.r;
-
 }
 
 /**

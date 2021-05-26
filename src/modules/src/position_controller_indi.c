@@ -52,123 +52,132 @@ static float velS_x, velS_y, velS_z;			// Current velocity
 static struct Vectr positionRef; 
 static struct Vectr velocityRef;
 
-// // Ceiling effect Estimation
-// static float ceiling_dist; //variable to store ranger measurement 
+// Ceiling effect Estimation
+float ceiling_dist = 1.0f;
+float T_Ratio_RBF  = 1.0f; //variable to store ranger measurement 
 
-// /** Stucture for the RBF function */
-// static struct RBF_form_s RBF_t = {.centers_s = {0, 0.005, 0.015, 0.03, 0.06, 0.1}
-// 								, .kernel_width_s = {15000.0, 10000.0, 5000.0, 2000.0, 1250.0, 1000.0}
-// 								, .weights_s = {0.0,0.0,0.0,0.0,0.0,0.0,0.0}};
+/** Stucture for the RBF function */
+static struct RBF_form_s RBF_t = {.centers_s = {0, 0.005, 0.015, 0.03, 0.06, 0.1}
+								, .kernel_width_s = {15000.0, 10000.0, 5000.0, 2000.0, 1250.0, 1000.0}
+								, .weights_s = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}};
 
-// /** Structure for Ordinary least square regression (OLS) */
-// static struct OLS_s OLS_t = {.reg_rows = 21
-// 							, .reg_cols = 7
-// 							, .reg_matrix_s = {0.0f}
-// 						 	, .data_points_x_s = {0.0f, 0.005f, 0.01f, 0.015f, 0.02f, 0.025f,  0.030f, 0.035f,  0.040f, 0.045f, 0.050f, 0.055f, 0.060f, 0.065f, 0.070f, 0.075f,  0.080f, 0.085f, 0.090f, 0.095f, 0.10f}
-// 							, .data_points_y_s = {1.0f}
-// 							};
+/** Structure for Ordinary least square regression (OLS) */
+static struct OLS_s OLS_t = {.reg_rows = 21
+							, .reg_cols = 7
+							, .reg_matrix_s = {0.0f}
+						 	, .data_points_x_s = {0.0f, 0.005f, 0.01f, 0.015f, 0.02f, 0.025f,  0.030f, 0.035f,  0.040f, 0.045f, 0.050f, 0.055f, 0.060f, 0.065f, 0.070f, 0.075f,  0.080f, 0.085f, 0.090f, 0.095f, 0.10f}
+							, .data_points_y_s = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}
+							};
 
 
-// /** calculate one RBF function value, needed in regression matrix, thus calculated withouth the weight factor*/
-// float RBF_element(struct RBF_form_s *RBF, float x, int element){
-// 	float element_result;
-// 	element_result = expf(-RBF->kernel_width_s[element]*powf((x - RBF->centers_s[element]), 2));	
-// 	return element_result;
-// };
+/** calculate one RBF function value, needed in regression matrix, thus calculated withouth the weight factor*/
+float RBF_element(struct RBF_form_s *RBF, float x, int element){
+	float element_result;
+	element_result = expf(-RBF->kernel_width_s[element]*powf((x - RBF->centers_s[element]), 2));	
+	return element_result;
+};
 
-// /** calculated the value at given point of the RBF function */
-// float RBF_result(struct RBF_form_s *RBF, float x) {
-// 	float temp;
-// 	float total = 0;
-// 	//Calculate value of the 6 RBF hills and add together
-// 	for (int i = 0; i < 6; i++){
-// 		temp = RBF->weights_s[i+1]*expf(-RBF->kernel_width_s[i]*powf((x - RBF->centers_s[i]), 2));	
-// 		total += temp;
-// 	}
+/** calculated the value at given point of the RBF function */
+float RBF_result(struct RBF_form_s *RBF, float x) {
+	float temp;
+	float total = 0;
+	//Calculate value of the 6 RBF hills and add together
+	for (int i = 0; i < 6; i++){
+		temp = RBF->weights_s[i+1]*expf(-RBF->kernel_width_s[i]*powf((x - RBF->centers_s[i]), 2));	
+		total += temp;
+	}
 
-// 	//Add the constant times its weight
-// 	total += RBF->weights_s[0]*1;
+	//Add the constant times its weight
+	total += RBF->weights_s[0]*1;
 	
-// 	return total;
-// };
+	return total;
+};
 
-// /** calculated the value at given point of the derivative of the RBF function */
-// float RBF_der_result(struct RBF_form_s *RBF, float x) {
-// 	float temp = 0;
+/** calculated the value at given point of the derivative of the RBF function */
+float RBF_der_result(struct RBF_form_s *RBF, float x) {
+	float temp = 0;
 	
-// 	for (int i = 0; i < 6; i++){
-// 		temp += -2*RBF->kernel_width_s[i]*(x-RBF->centers_s[i])*RBF->weights_s[i+1]*expf(-RBF->kernel_width_s[i]*powf((x - RBF->centers_s[i]), 2));
-// 	}
+	for (int i = 0; i < 6; i++){
+		temp += -2*RBF->kernel_width_s[i]*(x-RBF->centers_s[i])*RBF->weights_s[i+1]*expf(-RBF->kernel_width_s[i]*powf((x - RBF->centers_s[i]), 2));
+	}
 
-// 	return temp;
-// };
+	return temp;
+};
 
-// /** Calculate the pseudo inverse of the refression matrix*/
-// arm_matrix_instance_f32 Pseudo_Inverse(struct OLS_s *OLS){
-// 	arm_matrix_instance_f32 A; //regression matrix instance
-// 	arm_mat_init_f32(&A, OLS->reg_rows, OLS->reg_cols, (float32_t *)OLS->reg_matrix_s);
+/** Calculate the pseudo inverse of the refression matrix*/
+arm_matrix_instance_f32 Pseudo_Inverse(struct OLS_s *OLS){
+	arm_matrix_instance_f32 A; //regression matrix instance
+	arm_mat_init_f32(&A, OLS->reg_rows, OLS->reg_cols, (float32_t *)OLS->reg_matrix_s);
 
-// 	float32_t AT_buf[7*21];
-// 	arm_matrix_instance_f32 AT; //transpose regression matrix instance
-// 	arm_mat_init_f32(&AT, 7, 21, (float32_t *)AT_buf);
-// 	arm_mat_trans_f32(&A, &AT);
+	float32_t AT_buf[7*21];
+	arm_matrix_instance_f32 AT; //transpose regression matrix instance
+	arm_mat_init_f32(&AT, 7, 21, (float32_t *)AT_buf);
+	arm_mat_trans_f32(&A, &AT);
 
-// 	float32_t AT_A_buf[7*7];
-// 	arm_matrix_instance_f32 AT_A; //Multiplication of AT and A 
-// 	arm_mat_init_f32(&AT_A, 7, 7, (float32_t *)AT_A_buf);
-// 	arm_mat_mult_f32(&AT, &A, &AT_A);
+	float32_t AT_A_buf[7*7];
+	arm_matrix_instance_f32 AT_A; //Multiplication of AT and A 
+	arm_mat_init_f32(&AT_A, 7, 7, (float32_t *)AT_A_buf);
+	arm_mat_mult_f32(&AT, &A, &AT_A);
 
-// 	float32_t AT_A_inv_buf[7*7];
-// 	arm_matrix_instance_f32 AT_A_inv; //Inverse of AT times A
-// 	arm_mat_init_f32(&AT_A_inv, 7, 7, (float32_t *)AT_A_inv_buf);
-// 	arm_mat_inverse_f32(&AT_A, &AT_A_inv);
+	float32_t AT_A_inv_buf[7*7];
+	arm_matrix_instance_f32 AT_A_inv; //Inverse of AT times A
+	arm_mat_init_f32(&AT_A_inv, 7, 7, (float32_t *)AT_A_inv_buf);
+	arm_mat_inverse_f32(&AT_A, &AT_A_inv);
 
-// 	float32_t pseudo_inv_buf[7*21];
-// 	arm_matrix_instance_f32 pseudo_inv;
-// 	arm_mat_init_f32(&pseudo_inv, 7, 21, (float32_t *)pseudo_inv_buf);
-// 	arm_mat_mult_f32(&AT_A_inv, &AT, &pseudo_inv);
+	float32_t pseudo_inv_buf[7*21];
+	arm_matrix_instance_f32 pseudo_inv;
+	arm_mat_init_f32(&pseudo_inv, 7, 21, (float32_t *)pseudo_inv_buf);
+	arm_mat_mult_f32(&AT_A_inv, &AT, &pseudo_inv); //Wanneer ik code debug en deze lijn run tijdens tick 2, verandert de waarde van isInit van true naar 180?
+	//kan dat komen doordat er niet genoeg memory is en dit dus de memory overschrijft van andere waardes en dus ook toevallig isInit, want dat zal dan niet de enige zijn
 
-// 	return pseudo_inv;
-// };
 
-// /** Calculated the weights with OLS*/
-// void OLS_weights(struct RBF_form_s *RBF, struct OLS_s *OLS){
-// 	arm_matrix_instance_f32 RBF_data_value; 
-// 	arm_mat_init_f32(&RBF_data_value, 21, 1, (float32_t *)OLS->data_points_y_s);
+	return pseudo_inv;
+};
 
-// 	float32_t new_weights_buf[7]; 
-// 	arm_matrix_instance_f32 new_weights; 
-// 	arm_mat_init_f32(&new_weights, 7, 1, (float32_t*)new_weights_buf);
+/** Calculated the weights with OLS*/
+void OLS_weights(struct RBF_form_s *RBF, struct OLS_s *OLS){
+	arm_matrix_instance_f32 RBF_data_value; 
+	arm_mat_init_f32(&RBF_data_value, 21, 1, (float32_t *)OLS->data_points_y_s);
 
-// 	float32_t pseudo_inv_buf[7*21];
-// 	arm_matrix_instance_f32 pseudo_inv;
-// 	arm_mat_init_f32(&pseudo_inv, 7, 21, (float32_t *)pseudo_inv_buf);
+	float32_t new_weights_buf[7]; 
+	arm_matrix_instance_f32 new_weights; 
+	arm_mat_init_f32(&new_weights, 7, 1, (float32_t*)new_weights_buf);
 
-// 	pseudo_inv = Pseudo_Inverse(OLS);
+	float32_t pseudo_inv_buf[7*21];
+	arm_matrix_instance_f32 pseudo_inv;
+	arm_mat_init_f32(&pseudo_inv, 7, 21, (float32_t *)pseudo_inv_buf);
 
-// 	arm_mat_mult_f32(&pseudo_inv, &RBF_data_value, &new_weights);
+	pseudo_inv = Pseudo_Inverse(OLS);
+
+	arm_mat_mult_f32(&pseudo_inv, &RBF_data_value, &new_weights);
 	
-// 	for (int i = 0; i < 7; i++){
-// 		RBF->weights_s[i] = new_weights.pData[i];
-// 	}
-// }
+	for (int i = 0; i < 7; i++){
+		RBF->weights_s[i] = new_weights.pData[i];
+	}
+}
 
-// /** Create the regression matrix, only if new data point is accepted*/
-// void Create_reg_mat(struct OLS_s *OLS, struct RBF_form_s *RBF){
-// 	int j = 0;
+/** Create the regression matrix, only if new data point is accepted*/
+void Create_reg_mat(struct OLS_s *OLS, struct RBF_form_s *RBF){
+	int j = 0;
+	int k = 0;
 
-// 	for (int i = 0; i < 7*21; i++){
+	for (int i = 0; i < 7*21; i++){
 
-// 		if (i == 0 || i % 7){
-// 			OLS->reg_matrix_s[i] = 1.0f;
-// 			j = 0;
-// 		}
-// 		else{
-// 			OLS->reg_matrix_s[i] = RBF_element(RBF,  *OLS->data_points_x_s, j); //Dit sterretje zorgt toch dat het de data is op, omdat het al een pointer is
-// 			j++;
-// 		};
-// 	};
-// };
+		if (i != 0 && i%7 == 0){
+			k++;	
+		}
+
+		if (i == 0 || i%7 == 0){
+			OLS->reg_matrix_s[i] = 1.0f;
+			j = 0;
+		}
+
+		else{
+			OLS->reg_matrix_s[i] = RBF_element(RBF,  OLS->data_points_x_s[k], j); //Dit sterretje zorgt toch dat het de data is op, omdat het al een pointer is
+			j++;
+		};
+	};
+};
 
 
 
@@ -330,77 +339,82 @@ void positionControllerINDI(const sensorData_t *sensors,
 		Thrust_0 = -9.81f/2.0f;
 	};
 
-	// //RBF calculation
-	// //Step 1 get distance and Thrust ratio measurement
-	// ceiling_dist = rangeGet(rangeUp);
-	// float T_Ratio_meas = Thrust_0 / indiOuter.linear_accel_s.z; //both are in m/s^2 (for ratio units do not matter)
+	//RBF calculation
+	//Step 1 get distance and Thrust ratio measurement
+	logVarId_t idUp = logGetVarId("range", "up");
+	uint16_t left = logGetUint(idUp);
+	ceiling_dist = left/1000.0f;
+	ceiling_dist = 0.01f;
 
-	// //Step 2 see if the measurement can be accepted as new data point
-	// bool data_accept = false;
 
- 	// if (ceiling_dist <= 0.1f && T_Ratio_meas < 2.5f){ //check if close enough at ceiling, and cap the max tratio to count for weird noise data points
+	float T_Ratio_meas = Thrust_0 / indiOuter.linear_accel_s.z; //both are in m/s^2 (for ratio units do not matter)
+
+	//Step 2 see if the measurement can be accepted as new data point
+	bool data_accept = false;
+
+ 	if (ceiling_dist <= 0.1f && T_Ratio_meas < 2.5f){ //check if close enough at ceiling, and cap the max tratio to count for weird noise data points
 		
-	// 	float data_dist_smallest = fabs(OLS_t.data_points_x_s[0] - ceiling_dist);
-	// 	int idx_data_dist_smallest = 0;
+		float data_dist_smallest = fabs(OLS_t.data_points_x_s[0] - ceiling_dist);
+		int idx_data_dist_smallest = 0;
 
-	// 	for (int i = 1; i < 21; i++){
-	// 		float data_dist = fabs(OLS_t.data_points_x_s[i] - ceiling_dist);
+		for (int i = 1; i < 21; i++){
+			float data_dist = fabs(OLS_t.data_points_x_s[i] - ceiling_dist);
 			
-	// 		if (data_dist < data_dist_smallest){
-	// 			data_dist_smallest = data_dist;
-	// 			idx_data_dist_smallest = i;
-	// 		}
-	// 	}
+			if (data_dist < data_dist_smallest){
+				data_dist_smallest = data_dist;
+				idx_data_dist_smallest = i;
+			}
+		}
 
-	// 	if (data_dist_smallest < 0.0025f){
-	// 		data_accept = true;
-	// 		OLS_t.data_points_y_s[idx_data_dist_smallest] = T_Ratio_meas;
-	// 	}
-	// }
+		if (data_dist_smallest < 0.0025f){
+			data_accept = true;
+			OLS_t.data_points_y_s[idx_data_dist_smallest] = T_Ratio_meas;
+		}
+	}
 
-	// //Step 3 update the regression matrix with new data point
-	// if (data_accept){
-	// 	Create_reg_mat(&OLS_t, &RBF_t);
+	//Step 3 update the regression matrix with new data point
+	if (data_accept){
+		Create_reg_mat(&OLS_t, &RBF_t);
 	
 	
-	// //Step 4 Calculate new weights with pseudoinverse
-	// 	OLS_weights(&RBF_t, &OLS_t);
-	// }
+	//Step 4 Calculate new weights with pseudoinverse
+		OLS_weights(&RBF_t, &OLS_t);
+	}
 
-	// //Step 5 Calculate the thrust ratio from the rbf and use that in the control effectiveness matrix
-	// float T_Ratio_RBF = RBF_result(&RBF_t, ceiling_dist); // the RBF ratio is in the control effectiveness when deriving to phi,theta,T
-	// float RBF_der_value = RBF_der_result(&RBF_t, ceiling_dist); //the derivative of the RBF is in the control effectiveness when deriving to z
+	//Step 5 Calculate the thrust ratio from the rbf and use that in the control effectiveness matrix
+	T_Ratio_RBF = RBF_result(&RBF_t, ceiling_dist); // the RBF ratio is in the control effectiveness when deriving to phi,theta,T
+	float RBF_der_value = RBF_der_result(&RBF_t, ceiling_dist); //the derivative of the RBF is in the control effectiveness when deriving to z
 
 	//END RBF CALC
 	float g11; float g12; float g13; float g21; float g22; float g23; float g31; float g32; float g33; 
-	// float g14; float g24; float g34;
+	float g14; float g24; float g34;
 
-	// if (ceiling_dist <= 0.1f){
-	// 	g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f); 
-	// 	g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f); 						
-	// 	g13 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi))*T_Ratio_RBF;
-	// 	g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f);
-	// 	g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f);
-	// 	g23 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi))*T_Ratio_RBF;
-	// 	g31 = (-sinf(att.phi)*cosf(att.theta))*Thrust_0*T_Ratio_RBF; //(-9.81f);
-	// 	g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0*T_Ratio_RBF; //(-9.81f);
-	// 	g33 = (cosf(att.phi)*cosf(att.theta))*T_Ratio_RBF;
+	if (ceiling_dist <= 0.1f){
+		g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f); 
+		g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f); 						
+		g13 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi))*T_Ratio_RBF;
+		g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f);
+		g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f);
+		g23 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi))*T_Ratio_RBF;
+		g31 = (-sinf(att.phi)*cosf(att.theta))*Thrust_0*T_Ratio_RBF; //(-9.81f);
+		g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0*T_Ratio_RBF; //(-9.81f);
+		g33 = (cosf(att.phi)*cosf(att.theta))*T_Ratio_RBF;
 
-	// 	g14 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi))*RBF_der_value*(1.0f/0.0037f);
-	// 	g24 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi))*RBF_der_value*(1.0f/0.0037f);
-	// 	g34 = (cosf(att.phi)*cosf(att.theta))*RBF_der_value*(1.0f/0.0037f);
-	// }
-	// else {
-	g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 
-	g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 						
-	g13 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi));
-	g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
-	g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
-	g23 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi));
-	g31 = (-sinf(att.phi)*cosf(att.theta))*Thrust_0; //(-9.81f);
-	g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0; //(-9.81f);
-	g33 = (cosf(att.phi)*cosf(att.theta));
-	// }
+		g14 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi))*RBF_der_value*(1.0f/0.0037f);
+		g24 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi))*RBF_der_value*(1.0f/0.0037f);
+		g34 = (cosf(att.phi)*cosf(att.theta))*RBF_der_value*(1.0f/0.0037f);
+	}
+	else {
+		g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 
+		g12 = (cosf(att.phi)*cosf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 						
+		g13 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi));
+		g21 = (-cosf(att.phi)*cosf(att.psi) - sinf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
+		g22 = (cosf(att.phi)*cosf(att.theta)*sinf(att.psi))*Thrust_0; //(-9.81f);
+		g23 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi));
+		g31 = (-sinf(att.phi)*cosf(att.theta))*Thrust_0; //(-9.81f);
+		g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0; //(-9.81f);
+		g33 = (cosf(att.phi)*cosf(att.theta));
+	}
 
 	//Maybe add the found forumula for thrust here using the pwm and battery voltage data, such that it is not fixed around hover thrust
 
@@ -441,16 +455,16 @@ void positionControllerINDI(const sensorData_t *sensors,
 	float g33_inv = a31_inv*g31 + a32_inv*g32 + a33_inv*g33;
 
 	// Lin. accel. error multiplied  G^(-1) matrix (T_tilde negated because motor accepts only positiv commands, angles are in rad)
-	// if (ceiling_dist <= 0.1f){
-	// 	indiOuter.phi_tilde = (g11_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g12_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g13_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z));
-	// 	indiOuter.theta_tilde = (g21_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g22_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g23_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z));
-	// 	indiOuter.T_tilde = (g31_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g32_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g33_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z))/K_thr;
-	// }
-	// else{
-	indiOuter.phi_tilde   = (g11_inv*indiOuter.linear_accel_err.x + g12_inv*indiOuter.linear_accel_err.y + g13_inv*indiOuter.linear_accel_err.z);
-	indiOuter.theta_tilde = (g21_inv*indiOuter.linear_accel_err.x + g22_inv*indiOuter.linear_accel_err.y + g23_inv*indiOuter.linear_accel_err.z);
-	indiOuter.T_tilde     = -(g31_inv*indiOuter.linear_accel_err.x + g32_inv*indiOuter.linear_accel_err.y + g33_inv*indiOuter.linear_accel_err.z)/K_thr; 	
-	// };
+	if (ceiling_dist <= 0.1f){
+		indiOuter.phi_tilde = (g11_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g12_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g13_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z));
+		indiOuter.theta_tilde = (g21_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g22_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g23_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z));
+		indiOuter.T_tilde = -(g31_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g32_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g33_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z))/K_thr;
+	}
+	else{
+		indiOuter.phi_tilde   = (g11_inv*indiOuter.linear_accel_err.x + g12_inv*indiOuter.linear_accel_err.y + g13_inv*indiOuter.linear_accel_err.z);
+		indiOuter.theta_tilde = (g21_inv*indiOuter.linear_accel_err.x + g22_inv*indiOuter.linear_accel_err.y + g23_inv*indiOuter.linear_accel_err.z);
+		indiOuter.T_tilde     = -(g31_inv*indiOuter.linear_accel_err.x + g32_inv*indiOuter.linear_accel_err.y + g33_inv*indiOuter.linear_accel_err.z)/K_thr; 	
+	}
 
 	// Filter thrust
 	filter_thrust(indiOuter.thr, &indiOuter.T_incremented, &indiOuter.T_inner_f);

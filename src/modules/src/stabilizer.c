@@ -256,7 +256,7 @@ static void stabilizerTask(void* param)
       stateEstimator(&state, tick);
       compressState();
 
-      commanderGetSetpoint(&setpoint, &state);
+      commanderGetSetpoint(&setpoint, &state); //Als die init verandert is dan faalt die in deze functie bij de Xqueuepeek
       compressSetpoint();
 
       collisionAvoidanceUpdateSetpoint(&setpoint, &sensorData, &state, tick);
