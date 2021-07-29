@@ -155,11 +155,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		// Rate-controled YAW is moving YAW angle setpoint
 		if (setpoint->mode.yaw == modeVelocity) {
 			attitudeDesired.yaw += setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT; //if line 140 (or the other setpoints) in crtp_commander_generic.c has the - sign remove add a -sign here to convert the crazyfly coords (ENU) to INDI  body coords (NED)
-			while (attitudeDesired.yaw > 180.0f)
-				attitudeDesired.yaw -= 360.0f;
-			while (attitudeDesired.yaw < -180.0f)
-				attitudeDesired.yaw += 360.0f;
-
+			capAngle(attitudeDesired.yaw);
 			attitudeDesired.yaw = radians(attitudeDesired.yaw); //convert to radians
 		} else {
 			attitudeDesired.yaw = setpoint->attitude.yaw;
@@ -287,7 +283,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		//(they have significant inertia, see the paper mentioned in the header for more explanation)
 		indi.du.p = 1.0f / indi.g1.p * (indi.angular_accel_ref.p - indi.rate_d[0]);
 		indi.du.q = 1.0f / indi.g1.q * (indi.angular_accel_ref.q - indi.rate_d[1]);
-		indi.du.r = 1.0f / (indi.g1.r + indi.g2) * (indi.angular_accel_ref.r - indi.rate_d[2] + indi.g2 * indi.du.r);
+		indi.du.r = 1.0f / (indi.g1.r - indi.g2) * (indi.angular_accel_ref.r - indi.rate_d[2] + indi.g2 * indi.du.r);
 
 
 		/*
@@ -326,7 +322,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 			positionControllerResetAllPID();
 
 			// Reset the calculated YAW angle for rate control
-			attitudeDesired.yaw = -state->attitude.yaw;
+			// attitudeDesired.yaw = -state->attitude.yaw;
 		}
 	}
 

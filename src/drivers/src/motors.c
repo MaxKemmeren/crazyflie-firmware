@@ -128,7 +128,7 @@ static uint16_t motorsConv16ToBits(uint16_t bits)
 //
 // And to get the PWM as a percentage we would need to divide the
 // Voltage needed with the Supply voltage.
-static uint16_t motorsCompensateBatteryVoltage(uint16_t ithrust)
+uint16_t motorsCompensateBatteryVoltage(uint16_t ithrust)
 {
   float thrust = ((float) ithrust / 65536.0f) * 60;
   float volts = -0.0006239f * thrust * thrust + 0.088f * thrust;
