@@ -30,6 +30,7 @@
 #include "pm.h"
 #include "range.h"
 #include "power_distribution.h"
+#include "motors.h"
 
 // Position controller gains
 float K_xi_x = 1.0f;
@@ -40,11 +41,20 @@ float K_dxi_x = 5.0f;
 float K_dxi_y = 5.0f;
 float K_dxi_z = 5.0f;
 // Thrust mapping parameter
-float K_thr = 0.00024730f;
+// float K_thr = 0.00024730f;
+float K_thr = 0.0003;
+
+
+float mass = 0.033;
+// float mass = 0.037;
 
 float Thrust_0 = 0.0f;
+float Thrust_0_N = 0.0f;
 float motor_norm[] = {0, 0, 0, 0};
 float motor_norm_test[] = {0,0,0,0};
+
+float g11; float g12; float g13; float g21; float g22; float g23; float g31; float g32; float g33; 
+float g14; float g24; float g34;
 
 static float posS_x, posS_y, posS_z;			// Current position
 static float velS_x, velS_y, velS_z;			// Current velocity
@@ -57,11 +67,18 @@ static struct Vectr velocityRef;
 // Ceiling effect Estimation
 float ceiling_dist = 1.0f;
 float T_Ratio_RBF  = 1.0f; //variable to store ranger measurement 
+float RBF_der_value = 1.0f;
+float T_Ratio_meas;
+float K_ctr_eff = 0.002;
+
 
 /** Stucture for the RBF function */
 static struct RBF_form_s RBF_t = {.centers_s = {0, 0.005, 0.015, 0.03, 0.06, 0.1}
 								, .kernel_width_s = {15000.0, 10000.0, 5000.0, 2000.0, 1250.0, 1000.0}
-								, .weights_s = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}};
+								// , .weights_s = {1.43142386f,  0.15021046f, -0.09754395f ,-0.07601899f ,-0.26694495f, -0.30407099f, -0.37406497f}};
+								// , .weights_s = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f}};
+								, .weights_s = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
+
 
 /** Structure for Ordinary least square regression (OLS) */
 static struct OLS_s OLS_t = {.reg_rows = 21
@@ -129,9 +146,7 @@ arm_matrix_instance_f32 Pseudo_Inverse(struct OLS_s *OLS){
 	float32_t pseudo_inv_buf[7*21];
 	arm_matrix_instance_f32 pseudo_inv;
 	arm_mat_init_f32(&pseudo_inv, 7, 21, (float32_t *)pseudo_inv_buf);
-	arm_mat_mult_f32(&AT_A_inv, &AT, &pseudo_inv); //Wanneer ik code debug en deze lijn run tijdens tick 2, verandert de waarde van isInit van true naar 180?
-	//kan dat komen doordat er niet genoeg memory is en dit dus de memory overschrijft van andere waardes en dus ook toevallig isInit, want dat zal dan niet de enige zijn
-
+	arm_mat_mult_f32(&AT_A_inv, &AT, &pseudo_inv); 
 
 	return pseudo_inv;
 };
@@ -145,10 +160,7 @@ void OLS_weights(struct RBF_form_s *RBF, struct OLS_s *OLS){
 	arm_matrix_instance_f32 new_weights; 
 	arm_mat_init_f32(&new_weights, 7, 1, (float32_t*)new_weights_buf);
 
-	float32_t pseudo_inv_buf[7*21];
 	arm_matrix_instance_f32 pseudo_inv;
-	arm_mat_init_f32(&pseudo_inv, 7, 21, (float32_t *)pseudo_inv_buf);
-
 	pseudo_inv = Pseudo_Inverse(OLS);
 
 	arm_mat_mult_f32(&pseudo_inv, &RBF_data_value, &new_weights);
@@ -175,11 +187,19 @@ void Create_reg_mat(struct OLS_s *OLS, struct RBF_form_s *RBF){
 		}
 
 		else{
-			OLS->reg_matrix_s[i] = RBF_element(RBF,  OLS->data_points_x_s[k], j); //Dit sterretje zorgt toch dat het de data is op, omdat het al een pointer is
+			OLS->reg_matrix_s[i] = RBF_element(RBF,  OLS->data_points_x_s[k], j);
 			j++;
 		};
 	};
 };
+
+void LMS_weight(struct RBF_form_s *RBF, float RBF_value, float RBF_meas_value, float data_point){
+	for (int i = 1; i < 7; i++){
+		RBF->weights_s[i] = RBF->weights_s[i] + 0.05f*(RBF_meas_value - RBF_value)*RBF_element(RBF, data_point, i);
+	}
+
+	RBF->weights_s[0] = RBF->weights_s[0] + 0.05f*(RBF_meas_value - RBF_value);
+}
 
 
 
@@ -330,10 +350,10 @@ void positionControllerINDI(const sensorData_t *sensors,
 	// negative psi to account for wrong coordinate frame in the implementation of the inner loop)
 	float Battery_norm = pmGetBatteryVoltage()/NORM_BATTERY;
 
-	motor_norm_test[0] = (motorPower.m1/NORM_THRUST);
-	motor_norm_test[1] = (motorPower.m2/NORM_THRUST);
-	motor_norm_test[2] = (motorPower.m3/NORM_THRUST);
-	motor_norm_test[3] = (motorPower.m4/NORM_THRUST);
+	motor_norm_test[0] = (motorsCompensateBatteryVoltage(motorPower.m1)/NORM_THRUST);
+	motor_norm_test[1] = (motorsCompensateBatteryVoltage(motorPower.m2)/NORM_THRUST);
+	motor_norm_test[2] = (motorsCompensateBatteryVoltage(motorPower.m3)/NORM_THRUST);
+	motor_norm_test[3] = (motorsCompensateBatteryVoltage(motorPower.m4)/NORM_THRUST);
 
 	motor_norm[0] = 11.093358483549203f - 39.08104165843915f * (motorPower.m1/NORM_THRUST) - 9.525647087583181f * Battery_norm + 20.573302305476638f * (motorPower.m1/NORM_THRUST) * (motorPower.m1/NORM_THRUST) + 38.42885066644033f * (motorPower.m1/NORM_THRUST) * Battery_norm;
 	motor_norm[1] = 11.093358483549203f - 39.08104165843915f * (motorPower.m2/NORM_THRUST) - 9.525647087583181f * Battery_norm + 20.573302305476638f * (motorPower.m2/NORM_THRUST) * (motorPower.m2/NORM_THRUST) + 38.42885066644033f * (motorPower.m2/NORM_THRUST) * Battery_norm;
@@ -348,7 +368,10 @@ void positionControllerINDI(const sensorData_t *sensors,
 		sum = sum + motor_norm[loop];      
   	}
 
-	Thrust_0 = ((sum/1000.0f)*-9.81f)/0.037f; //IMPORTANT the 0.037 is the mass, change this to a parameter and add to parameter list!
+	Thrust_0_N = Thrust_0_N + indiOuter.act_dyn_posINDI*(sum - Thrust_0_N);
+	// Thrust_0_N = sum;
+
+	Thrust_0 = ((Thrust_0_N/1000.0f)*-9.81f)/mass; 
 
 	//Thrust_0 cannot become zero due to matrix inversion.
 	if (Thrust_0 > -(9.81f/2.0f)){
@@ -360,15 +383,26 @@ void positionControllerINDI(const sensorData_t *sensors,
 	logVarId_t idUp = logGetVarId("range", "up");
 	uint16_t left = logGetUint(idUp);
 	ceiling_dist = left/1000.0f;
-	ceiling_dist = 0.01f;
+	// ceiling_dist = 0.01;
 
+	bool T_ratio_accept;
 
-	float T_Ratio_meas = Thrust_0 / indiOuter.linear_accel_s.z; //both are in m/s^2 (for ratio units do not matter)
+	if (indiOuter.linear_accel_s.z < 0){
+		T_Ratio_meas = fabs(indiOuter.linear_accel_s.z / Thrust_0); //both are in m/s^2 (for ratio units do not matter) KAN 0 Zijn 
+		T_ratio_accept = true; 
+	}
+	else{
+		T_ratio_accept = false;
+	}
 
-	//Step 2 see if the measurement can be accepted as new data point
-	bool data_accept = false;
+	// ceiling_dist = 0.5;
+	// T_Ratio_meas = 1.2;
+	// T_ratio_accept = true;
 
- 	if (ceiling_dist <= 0.1f && T_Ratio_meas < 2.5f){ //check if close enough at ceiling, and cap the max tratio to count for weird noise data points
+	// Step 2 see if the measurement can be accepted as new data point
+	// bool data_accept = false;
+
+ 	if (ceiling_dist <= 0.1f && T_Ratio_meas < 2.5f && T_ratio_accept == true){ //check if close enough at ceiling, and cap the max tratio to count for weird noise data points
 		
 		float data_dist_smallest = fabs(OLS_t.data_points_x_s[0] - ceiling_dist);
 		int idx_data_dist_smallest = 0;
@@ -382,28 +416,41 @@ void positionControllerINDI(const sensorData_t *sensors,
 			}
 		}
 
-		if (data_dist_smallest < 0.0025f){
-			data_accept = true;
-			OLS_t.data_points_y_s[idx_data_dist_smallest] = T_Ratio_meas;
+		if (data_dist_smallest < 0.0025f && (T_Ratio_meas >  OLS_t.data_points_y_s[idx_data_dist_smallest]*1.1f || T_Ratio_meas < OLS_t.data_points_y_s[idx_data_dist_smallest]*0.9f)){
+			// data_accept = true; 
+
+			for (int i = 0; i < idx_data_dist_smallest + 1; i++){
+				OLS_t.data_points_y_s[i] = T_Ratio_meas;
+			}
+
+			LMS_weight(&RBF_t, RBF_result(&RBF_t, OLS_t.data_points_x_s[idx_data_dist_smallest]), T_Ratio_meas, OLS_t.data_points_x_s[idx_data_dist_smallest]);
 		}
 	}
 
-	//Step 3 update the regression matrix with new data point
-	if (data_accept){
-		Create_reg_mat(&OLS_t, &RBF_t);
+	// // //Step 3 update the regression matrix with new data point
+	// if (data_accept){
+	// // 	Create_reg_mat(&OLS_t, &RBF_t);
 	
-	
-	//Step 4 Calculate new weights with pseudoinverse
-		OLS_weights(&RBF_t, &OLS_t);
-	}
+	// //Step 4 Calculate new weights with pseudoinverse
+	// 	// OLS_weights(&RBF_t, &OLS_t);
+	// }
 
 	//Step 5 Calculate the thrust ratio from the rbf and use that in the control effectiveness matrix
-	T_Ratio_RBF = RBF_result(&RBF_t, ceiling_dist); // the RBF ratio is in the control effectiveness when deriving to phi,theta,T
-	float RBF_der_value = RBF_der_result(&RBF_t, ceiling_dist); //the derivative of the RBF is in the control effectiveness when deriving to z
+	if (ceiling_dist <= 0.1f){
+		T_Ratio_RBF = RBF_result(&RBF_t, ceiling_dist); // the RBF ratio is in the control effectiveness when deriving to phi,theta,T
+		RBF_der_value = RBF_der_result(&RBF_t, ceiling_dist); //the derivative of the RBF is in the control effectiveness when deriving to z
+
+		// if (T_Ratio_RBF > 3){
+		// 	T_Ratio_RBF = 1.5;
+		// }
+
+		if (T_Ratio_RBF < 1){
+			T_Ratio_RBF = 1;
+		}
+
+	}
 
 	//END RBF CALC
-	float g11; float g12; float g13; float g21; float g22; float g23; float g31; float g32; float g33; 
-	float g14; float g24; float g34;
 
 	if (ceiling_dist <= 0.1f){
 		g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0*T_Ratio_RBF; //(-9.81f); 
@@ -416,9 +463,9 @@ void positionControllerINDI(const sensorData_t *sensors,
 		g32 = (-cosf(att.phi)*sinf(att.theta))*Thrust_0*T_Ratio_RBF; //(-9.81f);
 		g33 = (cosf(att.phi)*cosf(att.theta))*T_Ratio_RBF;
 
-		g14 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi))*RBF_der_value*(1.0f/0.0037f);
-		g24 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi))*RBF_der_value*(1.0f/0.0037f);
-		g34 = (cosf(att.phi)*cosf(att.theta))*RBF_der_value*(1.0f/0.0037f);
+		g14 = (sinf(att.phi)*sinf(att.psi) + cosf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0*RBF_der_value;
+		g24 = (-sinf(att.phi)*cosf(att.psi) + cosf(att.phi)*sinf(att.theta)*sinf(att.psi))*Thrust_0*RBF_der_value;
+		g34 = (cosf(att.phi)*cosf(att.theta))*Thrust_0*RBF_der_value;
 	}
 	else {
 		g11 = (cosf(att.phi)*sinf(att.psi) - sinf(att.phi)*sinf(att.theta)*cosf(att.psi))*Thrust_0; //(-9.81f); 
@@ -473,9 +520,9 @@ void positionControllerINDI(const sensorData_t *sensors,
 
 	// Lin. accel. error multiplied  G^(-1) matrix (T_tilde negated because motor accepts only positiv commands, angles are in rad)
 	if (ceiling_dist <= 0.1f){
-		indiOuter.phi_tilde = (g11_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g12_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g13_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z));
-		indiOuter.theta_tilde = (g21_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g22_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g23_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z));
-		indiOuter.T_tilde = -(g31_inv*(indiOuter.linear_accel_err.x  - g14*(1/ATTITUDE_RATE)*velS_z) + g32_inv*(indiOuter.linear_accel_err.y - g24*(1/ATTITUDE_RATE)*velS_z) + g33_inv*(indiOuter.linear_accel_err.z - g34*(1/ATTITUDE_RATE)*velS_z))/K_thr;
+		indiOuter.phi_tilde = (g11_inv*(indiOuter.linear_accel_err.x  - g14*K_ctr_eff*velS_z) + g12_inv*(indiOuter.linear_accel_err.y - g24*K_ctr_eff*velS_z) + g13_inv*(indiOuter.linear_accel_err.z - g34*K_ctr_eff*velS_z));
+		indiOuter.theta_tilde = (g21_inv*(indiOuter.linear_accel_err.x  - g14*K_ctr_eff*velS_z) + g22_inv*(indiOuter.linear_accel_err.y - g24*K_ctr_eff*velS_z) + g23_inv*(indiOuter.linear_accel_err.z - g34*K_ctr_eff*velS_z));
+		indiOuter.T_tilde = -(g31_inv*(indiOuter.linear_accel_err.x  - g14*K_ctr_eff*velS_z) + g32_inv*(indiOuter.linear_accel_err.y - g24*K_ctr_eff*velS_z) + g33_inv*(indiOuter.linear_accel_err.z - g34*K_ctr_eff*velS_z))/K_thr;
 	}
 	else{
 		indiOuter.phi_tilde   = (g11_inv*indiOuter.linear_accel_err.x + g12_inv*indiOuter.linear_accel_err.y + g13_inv*indiOuter.linear_accel_err.z);
@@ -519,6 +566,8 @@ PARAM_ADD(PARAM_FLOAT, K_xi_z, &K_xi_z)
 PARAM_ADD(PARAM_FLOAT, K_dxi_x, &K_dxi_x)
 PARAM_ADD(PARAM_FLOAT, K_dxi_y, &K_dxi_y)
 PARAM_ADD(PARAM_FLOAT, K_dxi_z, &K_dxi_z)
+
+PARAM_ADD(PARAM_FLOAT, K_dz_gain, &K_ctr_eff)
 
 PARAM_GROUP_STOP(posCtrlIndi)
 
@@ -585,6 +634,7 @@ LOG_ADD(LOG_FLOAT, cmd_phi, &indiOuter.attitude_c.phi)
 LOG_ADD(LOG_FLOAT, cmd_theta, &indiOuter.attitude_c.theta)
 
 LOG_ADD(LOG_FLOAT, T_0,  &Thrust_0)
+LOG_ADD(LOG_FLOAT, T_0_N,  &Thrust_0_N)
 
 LOG_ADD(LOG_FLOAT, motor_1_norm, &motor_norm_test[0])
 LOG_ADD(LOG_FLOAT, motor_2_norm, &motor_norm_test[1])
@@ -597,6 +647,21 @@ LOG_ADD(LOG_UINT32, motor_3, &motorPower.m3)
 LOG_ADD(LOG_UINT32, motor_4, &motorPower.m4)
 
 LOG_ADD(LOG_FLOAT, ceil_dist, &ceiling_dist)
-LOG_ADD(LOG_FLOAT, T_RBF, &T_Ratio_RBF)
+LOG_ADD(LOG_FLOAT, T_RBF_Ratio, &T_Ratio_RBF)
+LOG_ADD(LOG_FLOAT, T_MEAS_Ratio, &T_Ratio_meas)
+
+LOG_ADD(LOG_FLOAT, Weight_0, &RBF_t.weights_s[0])
+LOG_ADD(LOG_FLOAT, Weight_1, &RBF_t.weights_s[1])
+LOG_ADD(LOG_FLOAT, Weight_2, &RBF_t.weights_s[2])
+LOG_ADD(LOG_FLOAT, Weight_3, &RBF_t.weights_s[3])
+LOG_ADD(LOG_FLOAT, Weight_4, &RBF_t.weights_s[4])
+LOG_ADD(LOG_FLOAT, Weight_5, &RBF_t.weights_s[5])
+LOG_ADD(LOG_FLOAT, Weight_6, &RBF_t.weights_s[6])
+
+LOG_ADD(LOG_FLOAT, ctr_eff_g14, &g14)
+LOG_ADD(LOG_FLOAT, ctr_eff_g24, &g24)
+LOG_ADD(LOG_FLOAT, ctr_eff_g34, &g34)
+
+
 
 LOG_GROUP_STOP(posCtrlIndi)

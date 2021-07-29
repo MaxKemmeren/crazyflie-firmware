@@ -273,5 +273,8 @@ void motorsTestTask(void* params);
  * */
 void motorsBeep(int id, bool enable, uint16_t frequency, uint16_t ratio);
 
+uint16_t motorsCompensateBatteryVoltage(uint16_t ithrust);
+
+
 #endif /* __MOTORS_H__ */
 
