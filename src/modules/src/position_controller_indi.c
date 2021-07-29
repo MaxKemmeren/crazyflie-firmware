@@ -772,8 +772,7 @@ LOG_ADD(LOG_UINT32, motor_4, &motorPower.m4)
 
 LOG_ADD(LOG_FLOAT, ceil_dist, &ceiling_dist)
 LOG_ADD(LOG_FLOAT, T_RBF_Ratio, &T_Ratio_RBF)
-LOG_ADD(LOG_FLOAT, T_MEAS_Ratio, &T_RatioThrust_0_meas)
-
+LOG_ADD(LOG_FLOAT, T_MEAS_Ratio, &T_Ratio_meas)
 LOG_ADD(LOG_FLOAT, Weight_0, &RBF_t.weights_s[0])
 LOG_ADD(LOG_FLOAT, Weight_1, &RBF_t.weights_s[1])
 LOG_ADD(LOG_FLOAT, Weight_2, &RBF_t.weights_s[2])

@@ -60,7 +60,7 @@
 // #define STABILIZATION_INDI_G1_R 0.00068449f
 // #define STABILIZATION_INDI_G2_R 0.000046342f
 
-//Proportional gains inner INDI, attitude error
+//ProportiThrust_0onal gains inner INDI, attitude error
 #define STABILIZATION_INDI_REF_ERR_P 5.0f 
 #define STABILIZATION_INDI_REF_ERR_Q 5.0f
 #define STABILIZATION_INDI_REF_ERR_R 5.0f

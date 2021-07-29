@@ -149,10 +149,10 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		const state_t *state,
 		const uint32_t tick)
 {
-
 	//The z_distance decoder adds a negative sign to the yaw command, the position decoder doesn't
 	if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
 		// Rate-controled YAW is moving YAW angle setpoint
+
 		if (setpoint->mode.yaw == modeVelocity) {
 			attitudeDesired.yaw += setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT; //if line 140 (or the other setpoints) in crtp_commander_generic.c has the - sign remove add a -sign here to convert the crazyfly coords (ENU) to INDI  body coords (NED)
 			capAngle(attitudeDesired.yaw);
@@ -220,6 +220,8 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 		// For roll and pitch, if velocity mode, overwrite rateDesired with the setpoint
 		// value. Also reset the PID to avoid error buildup, which can lead to unstable
 		// behavior if level mode is engaged later
+		
+		//Not sure if there needs to be any sign inversion! @Max Kemmeren
 		if (setpoint->mode.roll == modeVelocity) {
 			rateDesired.roll = radians(setpoint->attitudeRate.roll);
 			attitudeControllerResetRollAttitudePID();
@@ -239,7 +241,7 @@ void controllerINDI(control_t *control, setpoint_t *setpoint,
 
 		filter_pqr(indi.rate, &body_rates);
 
-		/*
+Thrust_0		/*
 		 * 2 - Calculate the derivative with finite difference.
 		 */
 
